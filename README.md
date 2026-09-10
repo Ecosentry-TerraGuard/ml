@@ -1,114 +1,114 @@
-# ml
-# Landslide Risk Prediction — ML Module
+# landsliderisk-mlmodel
 
-AI-based landslide risk prediction system for the **Paglajhora–Tindharia Corridor, Darjeeling Himalayas**, built for Smart India Hackathon (SIH) 2026.
+Random Forest risk-prediction model for **TerraGuard** — SIH26001, "AI-Based Early
+Warning and Landslide Risk Monitoring System" (MDoNER, Disaster Management theme).
+Team: Ecosentry.
 
-This repository contains the machine learning component of the project: data preprocessing, model training, evaluation, and deployment as an API that powers real-time landslide risk alerts.
+## Status
 
-## Overview
+Trained and working on a documented **proxy dataset** (see below). This is an
+honest, explicitly-flagged limitation, not an oversight — no official NER-specific
+landslide dataset with matching features was available in our build window. The
+model, pipeline, and integration interface are complete and ready to swap in real
+data once collected.
 
-The model predicts landslide risk at locations within the study area, classifying risk into four levels — **Low / Medium / High / Critical** — using environmental and geospatial features. It is trained on historical data and deployed to work with live sensor and API feeds, with an additional tilt-sensor safety layer for real-time emergency escalation.
+## Why proxy data, and where the numbers come from
 
-### Monitored Zones
+`generate_dataset.py` builds a synthetic training set whose feature ranges and
+risk relationships are grounded in real, published landslide susceptibility
+research — including a study specifically covering **NH31A and East Sikkim
+Himalaya settlements** (geographically adjacent to our NER target region), plus
+broader Himalayan/Indian landslide literature. Specific cited ranges (e.g.
+"landslides most prevalent on 35–50° slopes and at 2000–2500mm / 3000–3300mm
+rainfall") are documented inline in that file with sources. This is not
+random noise — it's a documented, inspectable, physically-motivated labeling
+rule that can be scrutinized and replaced with real labels later.
 
-The dashboard monitors four zones:
+**This is a proxy for demo purposes. It is designed to be retrained on real
+field data post-deployment — see "Recalibration path" below.**
 
-- **Sohra (Meghalaya)**
-- **Mawsynram (Meghalaya)**
-- **Aizawl (Mizoram)**
-- **One NH (National Highway) corridor point**
+## Features
 
-### Training vs. Inference — One Model, Four Zones
+| Feature | Type | Source (live deployment) |
+|---|---|---|
+| `soil_moisture` | Live sensor | ESP32 + capacitive soil moisture sensor |
+| `rainfall_mm` | Live | Rainfall API / IMD data |
+| `slope` | Static, per-zone | SRTM DEM |
+| `ndvi` | Static, per-zone | Sentinel-2 imagery |
+| `landslide_density` | Static, per-zone | ISRO Bhuvan / GSI historical inventory |
 
-The model is trained on a **single dataset** — whichever available dataset has the most complete features (Sohra-area data preferred if available, otherwise any Indian/Himalayan landslide dataset with a similar feature set). This is purely a training-data choice, not a decision about which zones are monitored.
+**Tilt and vibration are deliberately NOT model inputs.** No historical tilt
+dataset exists to train against. Instead, tilt is used as a **live escalation
+check** (`check_tilt_escalation()` in `predict.py`): if the model already
+predicts Medium/High risk from sensor + geospatial features, and tilt spikes
+sharply above its baseline, the system escalates the warning one level. This
+keeps the trained model honest about what it actually learned, while still
+using tilt data where it's genuinely useful — as a live safety signal.
 
-At **prediction time**, the same trained model is used for all four zones. Each zone's own live sensor readings and static features (rainfall, soil moisture, slope, NDVI, landslide density) are fed into the model independently to generate that zone's risk prediction. So:
+## Model choice: Random Forest, not deep learning
 
-- **One trained model** (learned from one dataset's patterns)
-- **Four independent predictions** (one per zone, each using that zone's own input data)
+Deliberate choice, not a default:
+- **Interpretable** — `feature_importance.png` shows exactly which factors drove
+  a prediction. For a life-safety system, judges and field authorities need to
+  trust *why* an alert fired, not just that it did.
+- **Works on small/proxy tabular data** — deep learning needs far more labeled
+  examples than we have access to.
+- **No GPU dependency** — realistic for constrained NER field deployment.
 
-## Model
+## Files
 
-| | |
-|---|---|
-| **Algorithm** | Random Forest Classifier |
-| **Inputs** | Rainfall, Soil Moisture, Slope, NDVI, Landslide Density |
-| **Output** | Risk probability + Risk level (Low / Medium / High / Critical) |
+- `generate_dataset.py` — builds the documented proxy dataset (run standalone to
+  regenerate `proxy_landslide_dataset.csv`)
+- `train.py` — trains the Random Forest, writes `model.pkl`, `metrics.txt`,
+  `feature_importance.png`
+- `predict.py` — **the integration point.** Clean `predict_risk(...)` and
+  `check_tilt_escalation(...)` functions matching the signature agreed with the
+  backend team (`app/ml_client.py`). Run directly (`python predict.py`) for a
+  quick sanity check against hand-picked obvious scenarios.
+- `model.pkl` — the trained classifier (committed so backend can integrate
+  immediately without retraining)
+- `metrics.txt` — honest evaluation results, explicitly labeled as proxy-data
+  performance, not real-world accuracy
+- `feature_importance.png` — for the pitch/demo, to show this isn't a black box
 
-### Training Phase
-The model is trained on historical rainfall, historical soil moisture, slope, NDVI, and historical landslide inventory data. The trained model is saved/serialized for deployment.
+## Evaluation (proxy test set)
 
-### Deployment Phase
-The deployed model consumes **live rainfall** and **live soil moisture** values to predict current landslide risk in real time.
+See `metrics.txt` for full output. Headline: **83.1% recall on High-risk class**
+— we optimized for catching real high-risk cases (false negatives are far worse
+than false alarms for a disaster-warning system) over raw accuracy.
 
-### Tilt Sensor (Safety Layer)
-Historical tilt data is generally unavailable, so the tilt sensor is **not** used to train the model. Instead, it continuously monitors slope movement post-deployment. If the AI predicts high risk **and** the tilt sensor detects rapid change, the system automatically upgrades the warning level and triggers an emergency alert.
+**Report this honestly if asked**: these numbers describe how well the model
+learned the proxy data's patterns, not validated real-world NER accuracy.
 
-## Data Sources
+## Integration
 
-| Feature | Source |
-|---|---|
-| Rainfall | ERA5 / IMD |
-| Soil Moisture | Historical data (training) → live sensor (deployment) |
-| Slope | Calculated from SRTM DEM |
-| NDVI | Sentinel-2 imagery |
-| Landslide Density | Historical landslide inventory (ISRO / GSI) |
+```python
+from predict import predict_risk, check_tilt_escalation, escalate_level
 
-## Workflow
+score, level = predict_risk(
+    soil_moisture=59.0, rainfall_mm=2100, slope=38.0, ndvi=0.55,
+    landslide_density=2.3,
+)
 
+if level in ("Medium", "High") and check_tilt_escalation(tilt_angle=5.1, tilt_baseline=0.8):
+    level = escalate_level(level)
 ```
-Historical Data (single best-feature dataset,
-Sohra-area preferred, else similar Himalayan dataset)
-      │
-      ▼
-Train Random Forest  →  Single Trained Model
-      │
-      ▼
-Deploy Model
-      │
-      ├──▶ Sohra:      Live Rainfall + Soil Moisture + Static Features ──▶ Risk Prediction
-      ├──▶ Mawsynram:  Live Rainfall + Soil Moisture + Static Features ──▶ Risk Prediction
-      ├──▶ Aizawl:     Live Rainfall + Soil Moisture + Static Features ──▶ Risk Prediction
-      └──▶ NH Corridor:Live Rainfall + Soil Moisture + Static Features ──▶ Risk Prediction
-                              │
-                              ▼
-                      Tilt Sensor Check (per zone)
-                              │
-                              ▼
-                      Dashboard & Alerts (4 zones)
-```
 
-## Tech Stack
+## Recalibration path (post-deployment)
 
-- **Language/Libraries:** Python, Scikit-learn, Pandas, NumPy
-- **Geospatial:** QGIS, Sentinel-2, SRTM DEM, ERA5 / IMD
-- **Serving:** FastAPI
-- **Hardware/Sensors:** ESP32, Soil Moisture Sensor, Tilt Sensor
+1. Collect real sensor + rainfall readings from deployed nodes alongside actual
+   ground-truth outcomes (confirmed slope events / non-events) over a monitoring
+   period.
+2. Replace `generate_dataset.py`'s synthetic generation with the real collected
+   dataset (same column schema, so `train.py` needs no changes).
+3. Retrain: `python train.py` — produces an updated `model.pkl` as a drop-in
+   replacement, no changes needed on the backend integration side.
 
 ## Setup
 
 ```bash
-git clone <repo-url>
-cd <repo-folder>
-python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+python generate_dataset.py   # builds proxy_landslide_dataset.csv
+python train.py              # trains model.pkl, metrics.txt, feature_importance.png
+python predict.py            # sanity-check predictions on example scenarios
 ```
-
-## Usage
-
-**Train the model:**
-```bash
-python src/training/train.py
-```
-
-**Run the prediction API:**
-```bash
-uvicorn src.api.main:app --reload
-```
-
-*(Update these commands once actual script/file names are finalized.)*
-
-## Team / Project
-
-Part of the **SIH 2026** submission — AI-Based Landslide Risk Prediction for the Paglajhora–Tindharia Corridor, Darjeeling Himalayas.
