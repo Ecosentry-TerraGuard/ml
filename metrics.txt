@@ -5,17 +5,17 @@ NOTE: trained and evaluated on synthetic proxy data (see README.md / generate_da
 
               precision    recall  f1-score   support
 
-        High      0.769     0.831     0.799       160
-         Low      0.891     0.836     0.862       360
-      Medium      0.706     0.729     0.717       280
+        High      0.753     0.819     0.784       160
+         Low      0.882     0.811     0.845       360
+      Medium      0.675     0.711     0.692       280
 
-    accuracy                          0.797       800
-   macro avg      0.788     0.799     0.793       800
-weighted avg      0.802     0.797     0.799       800
+    accuracy                          0.777       800
+   macro avg      0.770     0.780     0.774       800
+weighted avg      0.784     0.777     0.779       800
 
 Confusion matrix (rows=actual, cols=predicted) [Low, Medium, High]:
-[[301  59   0]
- [ 36 204  40]
- [  1  26 133]]
+[[292  68   0]
+ [ 38 199  43]
+ [  1  28 131]]
 
-High-risk recall (most important metric for this use case): 0.831
+High-risk recall (most important metric for this use case): 0.819
