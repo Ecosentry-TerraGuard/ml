@@ -1,0 +1,5 @@
+model.pkl
+feature_importance.png
+proxy_landslide_dataset.csv
+__pycache__/
+*.pyc
