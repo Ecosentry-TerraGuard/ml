@@ -1,0 +1,21 @@
+TerraGuard Landslide Risk Model -- Evaluation (on PROXY test data)
+======================================================================
+
+NOTE: trained and evaluated on synthetic proxy data (see README.md / generate_dataset.py) -- these numbers describe how well the model learned the proxy data's patterns, NOT real-world NER accuracy. Report honestly as 'proxy validation performance' if asked.
+
+              precision    recall  f1-score   support
+
+        High      0.769     0.831     0.799       160
+         Low      0.891     0.836     0.862       360
+      Medium      0.706     0.729     0.717       280
+
+    accuracy                          0.797       800
+   macro avg      0.788     0.799     0.793       800
+weighted avg      0.802     0.797     0.799       800
+
+Confusion matrix (rows=actual, cols=predicted) [Low, Medium, High]:
+[[301  59   0]
+ [ 36 204  40]
+ [  1  26 133]]
+
+High-risk recall (most important metric for this use case): 0.831
