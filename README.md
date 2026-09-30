@@ -1,8 +1,8 @@
 # landsliderisk-mlmodel
 
-Random Forest risk-prediction model for **TerraGuard** — SIH26001, "AI-Based Early
-Warning and Landslide Risk Monitoring System" (MDoNER, Disaster Management theme).
-Team: Ecosentry.
+Random Forest risk-prediction model for **TerraGuard** — SIH26206, "AI-Based Early
+Warning and Landslide Risk Monitoring System" (AICTE, Student Innovation –
+Disaster Management theme). Team: Ecosentry.
 
 ## Status
 
